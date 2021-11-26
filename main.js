@@ -14,7 +14,7 @@ const socketToRoom = {};
 // roomID -> cantPersonas
 const rooms = {};
 let currentRoom = null;
-const maxPlayers = 4;
+const maxPlayers = 3;
 
 io.on('connection', socket => {
 
@@ -43,6 +43,24 @@ io.on('connection', socket => {
 
     socket.on("change direction", (direction) => {
       socket.to(socketToRoom[socket.id]).emit("update direction", { id: socket.id, direction })
+    })
+
+    socket.on("change position", (player) => {
+      switch (player.direction) {
+        case "left":
+          player.x -= player.velocity;
+          break;
+        case "right":
+          player.x += player.velocity;
+          break;
+        case "up":
+          player.y -= player.velocity;
+          break;
+        case "down":
+          player.y += player.velocity;
+          break;
+      }
+      io.to(socketToRoom[socket.id]).emit("player moved", {snake: player, id: socket.id})
     })
 
     socket.on("players collision", () => {

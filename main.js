@@ -14,7 +14,7 @@ const socketToRoom = {};
 // roomID -> cantPersonas
 const rooms = {};
 let currentRoom = null;
-const maxPlayers = 4;
+const maxPlayers = 2;
 
 io.on('connection', socket => {
 
@@ -42,7 +42,7 @@ io.on('connection', socket => {
     })
 
     socket.on("change direction", (direction) => {
-      socket.to(socketToRoom[socket.id]).emit("update direction", { id: socket.id, direction })
+      io.to(socketToRoom[socket.id]).emit("update direction", { id: socket.id, direction })
     })
 
     socket.on("players collision", () => {
@@ -72,6 +72,10 @@ io.on('connection', socket => {
 
     socket.on('game over', () => {
       const roomID = socketToRoom[socket.id];
+
+      if (!rooms[roomID])
+        return;
+    
       clearInterval(rooms[roomID].interval)
       delete rooms[roomID]
       delete socketToRoom[socket.id]

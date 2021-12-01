@@ -14,7 +14,7 @@ const socketToRoom = {};
 // roomID -> cantPersonas
 const rooms = {};
 let currentRoom = null;
-const maxPlayers = 2;
+const maxPlayers = 4;
 
 io.on('connection', socket => {
 

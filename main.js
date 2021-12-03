@@ -15,13 +15,20 @@ const socketToUser = {};
 // roomID -> cantPersonas
 const rooms = {};
 let currentRoom = null;
-const maxPlayers = 1;
+const maxPlayers = 4;
 
 io.on('connection', socket => {
 
     socket.on("join room", (user) => {
       if (currentRoom == null)
         currentRoom = uuid.v1();
+
+      if(socketToRoom[socket.id]) {
+        const roomID = socketToRoom[socket.id]
+        rooms[roomID].users = rooms[roomID].users.filter(id => id != socket.id);
+        delete socketToRoom[socket.id]
+        socket.leave(roomID)
+      }
       
       socketToRoom[socket.id] = currentRoom;
       socketToUser[socket.id] = user;
@@ -30,7 +37,7 @@ io.on('connection', socket => {
       else {
         rooms[currentRoom] = {}
         rooms[currentRoom].users = [user];
-        rooms[currentRoom].position = 4;
+        rooms[currentRoom].position = maxPlayers;
       }
 
       socket.join(currentRoom);
@@ -44,12 +51,13 @@ io.on('connection', socket => {
 
     socket.on("player lost", (score) => {
       const roomID = socketToRoom[socket.id];
-      const player = socketToUser[socket.id]
+      const player = socketToUser[socket.id];
 
       if (rooms[roomID] == undefined)
         return
 
       io.to(roomID).emit("update positions", {
+        id: socket.id,
         player,
         position: rooms[roomID].position--,
         score

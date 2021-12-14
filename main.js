@@ -15,29 +15,23 @@ const socketToUser = {};
 // roomID -> cantPersonas
 const rooms = {};
 let currentRoom = null;
-const maxPlayers = 4;
+const maxPlayers = 2;
 
 io.on('connection', socket => {
 
     socket.on("join room", (user) => {
       if (currentRoom == null)
         currentRoom = uuid.v1();
-
-      if(socketToRoom[socket.id]) {
-        const roomID = socketToRoom[socket.id]
-        rooms[roomID].users = rooms[roomID].users.filter(id => id != socket.id);
-        delete socketToRoom[socket.id]
-        socket.leave(roomID)
-      }
       
       socketToRoom[socket.id] = currentRoom;
-      socketToUser[socket.id] = user;
+      socketToUser[socket.id] = {user, socket: socket.id};
       if (rooms[currentRoom])
-        rooms[currentRoom].users.push(user);
+        rooms[currentRoom].users.push({user, socket:socket.id});
       else {
         rooms[currentRoom] = {}
-        rooms[currentRoom].users = [user];
+        rooms[currentRoom].users = [{user, socket:socket.id}];
         rooms[currentRoom].position = maxPlayers;
+        rooms[currentRoom].results = [];
       }
 
       socket.join(currentRoom);
@@ -56,39 +50,58 @@ io.on('connection', socket => {
       if (rooms[roomID] == undefined)
         return
 
-      io.to(roomID).emit("update positions", {
-        id: socket.id,
-        player,
-        position: rooms[roomID].position--,
-        score
-      })
-      // rooms[roomID].users = rooms[roomID].users.filter(id => id != socket.id);
-      // delete socketToRoom[socket.id]
-      // socket.leave(roomID)
+      let pos
+      console.log("results")
+      console.log(rooms[roomID].results)
+      for(pos = 0; pos < rooms[roomID].results.length && rooms[roomID].results[pos].score > score; pos++);
+      rooms[roomID].results.splice(pos, 0, {player, score})
+      delete socketToRoom[socket.id]
+      if(rooms[roomID].results.length == maxPlayers) {
+        io.to(roomID).emit("results finish", rooms[roomID].results)
+        delete rooms[roomID]
+      }
     })
 
     socket.on('disconnect', () => {
         const roomID = socketToRoom[socket.id];
+        const player = socketToUser[socket.id];
 
         if (rooms[roomID] == undefined)
           return
 
-        if (roomID != currentRoom)
-          socket.to(roomID).emit("update positions", socket.id)
+        rooms[roomID].users = rooms[roomID].users.filter(user => user.socket != socket.id);
 
-        rooms[roomID].users = rooms[roomID].users.filter(id => id != socket.id);
+        if (roomID == currentRoom) {
+          io.to(currentRoom).emit("user left", rooms[currentRoom].users.length)
+        }
+
+        rooms[roomID].results.push({player, score:0})
+        if(rooms[roomID].results.length == maxPlayers) {
+          io.to(roomID).emit("results finish", rooms[roomID].results)
+          delete rooms[roomID]
+        }
         delete socketToRoom[socket.id]
     });
 
-    socket.on('game over', () => {
+    socket.on("leaving pvp", () => {
       const roomID = socketToRoom[socket.id];
+      const player = socketToUser[socket.id];
 
-      if (!rooms[roomID])
-        return;
+      if (rooms[roomID] == undefined)
+        return
 
-      delete rooms[roomID]
+      rooms[roomID].users = rooms[roomID].users.filter(user => user.socket != socket.id);
+
+      if (roomID == currentRoom) {
+        io.to(currentRoom).emit("user left", rooms[currentRoom].users.length)
+      }
+
+      rooms[roomID].results.push({player, score:0})
+      if(rooms[roomID].results.length == maxPlayers) {
+        io.to(roomID).emit("results finish", rooms[roomID].results)
+        delete rooms[roomID]
+      }
       delete socketToRoom[socket.id]
-      socket.leave(roomID)
     })
 
 });
